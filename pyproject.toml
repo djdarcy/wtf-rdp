@@ -71,15 +71,14 @@ version = {attr = "wtf_rdp._version.PIP_VERSION"}
 where = ["."]
 include = ["wtf_rdp", "wtf_rdp.*"]
 
-# Bundle the mixed assets (PowerShell watchdog/clicker, kit definitions, tool
-# manifests, and nssm.exe) as package data so `pip install wtf-rdp` is
-# self-contained and `rdp sessfix install` needs no git clone or downloads.
+# Bundle the PowerShell scripts, kit definitions, and tool manifests as package
+# data. NSSM is NOT bundled (a third-party binary doesn't belong in a PyPI wheel);
+# `rdp setup sessfix` downloads a checksum-verified nssm.exe at install time.
 [tool.setuptools.package-data]
 wtf_rdp = [
     "kits/*.json",
     "tools/**/*",
     "assets/*.ps1",
-    "assets/*.exe",
 ]
 
 [tool.pytest.ini_options]

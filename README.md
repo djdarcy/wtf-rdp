@@ -4,23 +4,22 @@
 [![Release Date](https://img.shields.io/github/release-date/djdarcy/wtf-rdp?color=green)](https://github.com/djdarcy/wtf-rdp/releases)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL%20v3-green.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-lightgrey.svg)](#cross-platform)
+[![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/djdarcy/ecab69d64a306da6fe53251fd1dc286f/raw/installs.json)](https://djdarcy.github.io/wtf-rdp/stats/#installs)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-lightgrey.svg)](#platform)
 
 > **Rescue the RDP session Windows would make you destroy.**
 
-Windows RDP session-rescue tooling. A [wtf-windows](https://github.com/djdarcy/wtf-windows)-family CLI (`rdp`) built on the [DazzleCMD](https://github.com/DazzleTools/dazzlecmd) pattern that **detects and non-destructively recovers RDP sessions wedged or blocked by Local Session Manager (LSM)** -- the *"You're unable to sign in because you're already signed in to another session that is blocked"* failure that otherwise forces you to sign the session out and lose your work.
+Windows RDP session-rescue tooling. A [wtf-windows](https://github.com/djdarcy/wtf-windows)-family CLI (`rdp`) built on the [DazzleCMD](https://github.com/DazzleTools/dazzlecmd) pattern that detects and non-destructively recovers RDP sessions wedged or blocked by Local Session Manager (LSM) -- the *"You're unable to sign in because you're already signed in to another session that is blocked"* failure that otherwise forces you to sign the session out and lose your work.
 
 ## Why wtf-rdp?
 
-Have you ever RDP'd into a machine, had the connection drop ungracefully, and then found yourself **locked out of your own session** -- with Windows offering only to *sign out* (and destroy) the very session holding your unsaved work?
+Have you ever RDP'd into a machine, had the connection drop ungracefully, and then found yourself locked out of your own session with Windows offering only to sign-out (and destroy) the very session holding your unsaved work?
 
-That's the Local Session Manager block. An ungraceful `mstsc` disconnect can flag your session **"blocked by Local Session Manager,"** after which Windows refuses *every* sign-in -- RDP **and** the physical console -- and the only button it gives you is the one that throws your work away. On client Windows (single interactive session), you can't even spin up a second session to fix it. The block counter climbs and never expires.
+That's the Local Session Manager block. An ungraceful `mstsc` disconnect can flag your session "blocked by Local Session Manager," after which Windows refuses *every* sign-in (RDP and the physical console) and the only button it gives you is the one that throws your work away. On client Windows (single interactive session), you can't even spin up a second session to fix it. The block counter climbs and never expires.
 
-Enter `rdp`...
+Enter `wtf-rdp`...
 
-wtf-rdp installs a tiny **`SYSTEM` watchdog service** (hosted by NSSM as LocalSystem) that watches for the wedge signature -- a console session stuck connecting, corroborated by the LSM transition-failure event -- and **reconnects the stranded session via `tscon`** before Windows can garbage-collect it. Because it runs as `SYSTEM` it holds the `SeTcbPrivilege` that `tscon` needs, so recovery works with **no change to the machine's admin/token model**, and (with the lock-after-rescue step) leaves the box **locked, not open**.
-
-> Validated on a live target 2026-07-07: a `SYSTEM` `tscon` reconnected a stranded session (logon time unchanged) *and* cleared the console wedge in one move; the watchdog service ran the full detect → confirm → rescue loop autonomously.
+wtf-rdp installs a tiny `SYSTEM` watchdog service (hosted by NSSM as LocalSystem) that watches for the wedge signature (a console session stuck connecting, corroborated by the LSM transition-failure event) and reconnects the stranded session via `tscon` before Windows can garbage-collect it. Because it runs as `SYSTEM` it holds the `SeTcbPrivilege` that `tscon` needs, so recovery works with no change to the machine's admin/token model, and (with the lock-after-rescue step) leaves the box locked, not open.
 
 ## Features
 
@@ -28,7 +27,7 @@ wtf-rdp installs a tiny **`SYSTEM` watchdog service** (hosted by NSSM as LocalSy
 - **Autonomous watchdog**: a `SYSTEM` service detects the wedge and rescues it on its own, before Windows can destroy the session
 - **No OS changes required**: runs as LocalSystem; no `LocalAccountTokenFilterPolicy`, no enabled built-in Administrator, no weakened token model
 - **Event-driven detection**: keys on the real LSM wedge signature (not just "disconnected"), so it acts on genuine blocks and stays silent on normal idle disconnects
-- **Self-contained**: the watchdog script and `nssm.exe` ship inside the wheel -- `pip install` and go, no git clone, no manual downloads
+- **Real Windows service**: NSSM hosts the watchdog as a `LocalSystem` service you can query and control with standard tooling (`Get-Service`, `services.msc`); `rdp setup sessfix` fetches a checksum-verified NSSM, so the wheel stays pure Python (no bundled binaries)
 - **DazzleCMD aggregator**: `rdp <tool> [args]` works anywhere; tools grow as additional kits without changing the CLI
 
 ## Installation
@@ -86,29 +85,17 @@ Run `rdp list` to see what's active on your machine.
 
 ## How It Works
 
-1. **Discovery**: on startup, `rdp` scans `wtf_rdp/kits/*.kit.json` and the `wtf_rdp/tools/<kit>/<tool>/.wtf-rdp.json` manifests
-2. **Dispatch**: each tool's `runtime.type` determines how it runs -- the `sessfix` tools are `shell`/`powershell`, so `rdp` invokes the bundled `.ps1` (each script is also runnable standalone)
-3. **The watchdog** (`assets/Watch-RdpSession.ps1`, hosted by NSSM as `SYSTEM`): polls session state, and when it sees a console stuck connecting **corroborated by an LSM transition-failure event**, waits a confirm window and then `tscon`s the stranded user session back -- non-destructively -- before Windows garbage-collects it
+wtf-rdp targets one specific Windows failure and recovers from it *without destroying your session*.
 
-New runtime types can be registered by kits (the dispatch is a pluggable factory), and future tools that need to go under the hood can ship as native `binary` runtimes.
+**The failure.** When an RDP connection drops ungracefully, Windows can leave the session wedged and Local Session Manager flags it "blocked." From then on every sign-in -- RDP *and* the physical console -- is refused, and the only recovery Windows offers is to *sign the session out*, which kills everything running in it. The block never times out on its own, and on client Windows (single interactive session) you can't even open a second session to fix it.
 
-## Tool Manifests
+**Detection.** A wedge looks, to a naive check, exactly like a healthy machine sitting at its login screen -- so wtf-rdp does *not* act on "a session is disconnected." It watches for the real wedge signature: a **console session stuck in the connecting state**, corroborated by the **Local Session Manager transition-failure event** a dirty disconnect emits. It then waits a short **confirm window**; transitions that resolve on their own are ignored, so a normal idle disconnect never triggers a rescue.
 
-Each tool has a `.wtf-rdp.json` manifest. Only `name` and `description` are required; the rest describe how the tool is dispatched:
+**Recovery.** Once a wedge is confirmed, wtf-rdp reconnects the stranded session with **`tscon`** -- it *reconnects*, never signs out, so every process in the session keeps running. The rescue runs as **`SYSTEM`** because reconnecting another user's session needs `SeTcbPrivilege`, which only `SYSTEM` holds -- which is why **nothing about the machine's admin accounts or token policy has to change**. Immediately after reconnecting, the session is left **locked** (not an open desktop), so a recovered box is never left exposed.
 
-```json
-{
-    "name": "status",
-    "description": "Show the watchdog service state, recent rescues, and the live session table.",
-    "category": "sessfix",
-    "runtime": {
-        "type": "shell",
-        "shell": "powershell",
-        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
-        "script_path": "status.ps1"
-    }
-}
-```
+**Where it runs.** The rescue logic is a small PowerShell watchdog (`Watch-RdpSession.ps1`) hosted by **NSSM as a LocalSystem service**, so it keeps watching across reboots and can act even when nobody is logged in. `rdp setup sessfix` installs it; `rdp status` / `rdp recover` drive it.
+
+Want to add your own tools or a new kit? See **[Extending wtf-rdp](docs/extending.md)**.
 
 ## Project Structure
 
@@ -124,13 +111,15 @@ wtf-rdp/
 │   │   └── sessfix.kit.json     # the sessfix tool list
 │   ├── tools/sessfix/           # per-tool manifests + scripts
 │   │   └── status/              # .wtf-rdp.json + status.ps1
-│   └── assets/                  # bundled: Watch-RdpSession.ps1, Invoke-RdpConnect.ps1, nssm.exe
+│   └── assets/                  # bundled scripts: Watch-RdpSession.ps1, Invoke-RdpConnect.ps1
 ├── docs/                        # platform support + guides
 ├── tests/
 └── scripts/                     # repokit-common: version management + git hooks
 ```
 
-## Cross-Platform
+## Platform
+
+**Windows only.** wtf-rdp targets a Windows RDP / Local Session Manager failure, so the runtime tooling (watchdog, `tscon`, `qwinsta`) runs only on Windows.
 
 | Platform | Status |
 |----------|--------|
@@ -138,10 +127,11 @@ wtf-rdp/
 | Windows 10 | Expected (same session / WTS / `tscon` / LSM surfaces) |
 | Windows Server + RDS | Expected (multi-session; the client single-session limit does not apply) |
 
-The runtime tooling is Windows-only; the `rdp` CLI installs cross-platform but its `sessfix` tools no-op / warn off-Windows. See [Platform Support](docs/platform-support.md).
+The `rdp` CLI is Python and will install elsewhere, but its `sessfix` tools no-op / warn off-Windows. See [Platform Support](docs/platform-support.md).
 
 ## Documentation
 
+- **[Extending wtf-rdp](docs/extending.md)** -- add your own tools or a new kit
 - **[Roadmap](ROADMAP.md)** -- phased plan and status
 - **[Platform Support](docs/platform-support.md)** -- OS compatibility matrix
 - **[Changelog](CHANGELOG.md)** -- release history

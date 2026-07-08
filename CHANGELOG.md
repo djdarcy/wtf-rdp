@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-08
+### Changed
+- Reworked the README into the DazzleCMD format; "How It Works" now explains the RDP-recovery strategy (failure / detection / recovery / where it runs) rather than aggregator plumbing; renamed the "Cross-Platform" section to "Platform" (Windows-only).
+### Added
+- `docs/extending.md` — how to add your own kits and tools (moved out of the README).
+- Installs badge + GitHub traffic-tracker (ghtraf) dashboard, workflow, and gists.
+### Removed
+- `nssm.exe` is no longer bundled in the wheel (dropped from `package-data`). `rdp setup sessfix` will download a checksum-verified NSSM at install time, keeping the wheel pure-Python while NSSM stays a real, queryable Windows service.
+
 ## [0.1.1] - 2026-07-08
 ### Changed
 - Re-added `.github/dependabot.yml` with the GitHub Actions bumps (`actions/checkout` v7, `actions/cache` v6) pre-applied — held out of the initial push so Dependabot wouldn't consume the reserved Roadmap / Quick Notes issue numbers.
@@ -17,6 +26,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Bundled assets: the `SYSTEM` watchdog service script (`Watch-RdpSession.ps1`), the RDP auto-connect test clicker (`Invoke-RdpConnect.ps1`), and `nssm.exe` — shipped as package data toward a self-contained `pip install`.
 - Design record migrated to `private/` (postmortem, dev-workflow-process design, session-rescue watchdog design note) from the validation work on 2026-07-07: the `SYSTEM` `tscon` rescue mechanism and the autonomous detect→confirm→rescue loop, verified on a live target.
 
-[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/djdarcy/wtf-rdp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/djdarcy/wtf-rdp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/djdarcy/wtf-rdp/releases/tag/v0.1.0
