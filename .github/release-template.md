@@ -20,13 +20,13 @@
 ## Installation
 
 ```bash
-pip install $PACKAGE_NAME
+pip install wtf_rdp
 ```
 
 ### From Source
 ```bash
-git clone https://github.com/$GITHUB_ORG/$PROJECT_NAME.git
-cd $PROJECT_NAME
+git clone https://github.com/DazzleTools/wtf-rdp.git
+cd wtf-rdp
 pip install -e .
 ```
 

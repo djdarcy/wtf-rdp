@@ -1,6 +1,6 @@
-# Contributing to $PROJECT_NAME
+# Contributing to wtf-rdp
 
-Thank you for considering contributing to $PROJECT_NAME!
+Thank you for considering contributing to wtf-rdp!
 
 ## Development Setup
 
@@ -12,8 +12,8 @@ Thank you for considering contributing to $PROJECT_NAME!
 ### Clone and Install
 
 ```bash
-git clone https://github.com/$GITHUB_ORG/$PROJECT_NAME.git
-cd $PROJECT_NAME
+git clone https://github.com/DazzleTools/wtf-rdp.git
+cd wtf-rdp
 python -m venv .venv
 source .venv/bin/activate        # Linux/Mac
 # or: .venv\Scripts\activate     # Windows
@@ -29,9 +29,9 @@ python -m pytest tests/ -v
 ## Project Structure
 
 ```
-$PACKAGE_NAME/
+wtf_rdp/
   __init__.py         # Package initialization
-  __main__.py         # CLI entry (python -m $PACKAGE_NAME)
+  __main__.py         # CLI entry (python -m wtf_rdp)
   _version.py         # Version (PEP 440)
 tests/
   conftest.py         # Shared fixtures
