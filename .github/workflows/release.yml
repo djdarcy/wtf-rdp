@@ -8,6 +8,9 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
+  # Manual fallback: run the same build + publish by hand from the Actions tab
+  # (builds whatever ref you pick -- the default branch unless you select a tag).
+  workflow_dispatch:
 
 permissions:
   id-token: write
