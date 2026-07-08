@@ -12,7 +12,7 @@ Thank you for considering contributing to wtf-rdp!
 ### Clone and Install
 
 ```bash
-git clone https://github.com/DazzleTools/wtf-rdp.git
+git clone https://github.com/djdarcy/wtf-rdp.git
 cd wtf-rdp
 python -m venv .venv
 source .venv/bin/activate        # Linux/Mac

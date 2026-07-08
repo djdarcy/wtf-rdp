@@ -5,29 +5,48 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "wtf-rdp"
 dynamic = ["version"]
-description = "A new project created from git-repokit-template"
+description = "Windows RDP session-rescue tooling: a wtf-windows-family CLI (rdp) built on dazzlecmd-lib that detects and non-destructively recovers RDP sessions wedged/blocked by Local Session Manager."
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
 requires-python = ">=3.10"
 authors = [
-    {name = "djdarcy", email = "djdarcy@users.noreply.github.com"},
+    {name = "Dustin Darcy", email = "djdarcy@users.noreply.github.com"},
 ]
-keywords = []
+keywords = [
+    "rdp",
+    "windows",
+    "remote-desktop",
+    "local-session-manager",
+    "tscon",
+    "session-recovery",
+    "watchdog",
+    "sysadmin",
+    "incident-response",
+    "nssm",
+]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+    "Topic :: System :: Monitoring",
     "Topic :: Utilities",
 ]
 
-dependencies = []
+dependencies = [
+    "dazzlecmd-lib>=0.8,<1.0",
+    "rich>=13.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -36,11 +55,13 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/DazzleTools/wtf-rdp"
-Repository = "https://github.com/DazzleTools/wtf-rdp"
-Issues = "https://github.com/DazzleTools/wtf-rdp/issues"
+Homepage = "https://github.com/djdarcy/wtf-rdp"
+Repository = "https://github.com/djdarcy/wtf-rdp"
+Issues = "https://github.com/djdarcy/wtf-rdp/issues"
 
+# `rdp` is the short, discoverable command; `wtf-rdp` is kept as an explicit alias.
 [project.scripts]
+rdp = "wtf_rdp.cli:main"
 wtf-rdp = "wtf_rdp.cli:main"
 
 [tool.setuptools.dynamic]
@@ -49,6 +70,17 @@ version = {attr = "wtf_rdp._version.PIP_VERSION"}
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["wtf_rdp", "wtf_rdp.*"]
+
+# Bundle the mixed assets (PowerShell watchdog/clicker, kit definitions, tool
+# manifests, and nssm.exe) as package data so `pip install wtf-rdp` is
+# self-contained and `rdp sessfix install` needs no git clone or downloads.
+[tool.setuptools.package-data]
+wtf_rdp = [
+    "kits/*.json",
+    "tools/**/*",
+    "assets/*.ps1",
+    "assets/*.exe",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -59,6 +91,6 @@ python_classes = "Test*"
 [tool.repokit-common]
 version-source = "wtf_rdp/_version.py"
 changelog = "CHANGELOG.md"
-repo-url = "https://github.com/DazzleTools/wtf-rdp"
+repo-url = "https://github.com/djdarcy/wtf-rdp"
 tag-prefix = "v"
 private-patterns = ["private/", "local/", ".env"]

@@ -25,7 +25,7 @@ pip install wtf_rdp
 
 ### From Source
 ```bash
-git clone https://github.com/DazzleTools/wtf-rdp.git
+git clone https://github.com/djdarcy/wtf-rdp.git
 cd wtf-rdp
 pip install -e .
 ```

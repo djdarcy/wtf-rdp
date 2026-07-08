@@ -1,0 +1,13 @@
+{
+    "name": "sessfix",
+    "version": "0.1.0",
+    "description": "Detect and non-destructively recover RDP sessions wedged/blocked by Local Session Manager.",
+    "author": "djdarcy",
+    "always_active": true,
+    "tools_dir": "tools",
+    "manifest": ".wtf-rdp.json",
+    "tools": [
+        "sessfix:status"
+    ],
+    "notes": "First category of the wtf-rdp aggregator. `status` ships first (read-only). install/uninstall/query/recover/logs/config land next, each as tools/sessfix/<tool>/.wtf-rdp.json + a .ps1 wrapping the bundled watchdog in assets/."
+}

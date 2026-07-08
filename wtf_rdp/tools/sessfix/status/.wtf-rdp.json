@@ -1,0 +1,11 @@
+{
+    "name": "status",
+    "description": "Show the watchdog service state, recent rescues, and the live session table.",
+    "category": "sessfix",
+    "runtime": {
+        "type": "shell",
+        "shell": "powershell",
+        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+        "script_path": "status.ps1"
+    }
+}
