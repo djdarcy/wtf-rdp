@@ -1,0 +1,11 @@
+{
+    "name": "query",
+    "description": "Enumerate sessions and flag stranded / wedge candidates (read-only diagnostic).",
+    "category": "sessfix",
+    "runtime": {
+        "type": "shell",
+        "shell": "powershell",
+        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+        "script_path": "query.ps1"
+    }
+}

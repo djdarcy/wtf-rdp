@@ -8,9 +8,12 @@
     "manifest": ".wtf-rdp.json",
     "tools": [
         "sessfix:status",
+        "sessfix:query",
         "sessfix:install",
         "sessfix:recover",
+        "sessfix:logs",
+        "sessfix:config",
         "sessfix:uninstall"
     ],
-    "notes": "First category of the wtf-rdp aggregator. Shipping: status (read-only), install (NSSM LocalSystem watchdog service), recover (manual tscon + lock), uninstall. The rescue logic lives in the shared lib/WtfRdp.Sessions.psm1 module. Planned: query/logs/config."
+    "notes": "First category of the wtf-rdp aggregator. Shipping: status (read-only), query (session diagnostic), install (NSSM LocalSystem watchdog service), recover (manual tscon + lock), logs (watchdog log viewer), config (get/set watchdog params), uninstall. The rescue logic lives in the shared lib/WtfRdp.Sessions.psm1 module."
 }

@@ -1,0 +1,11 @@
+{
+    "name": "logs",
+    "description": "View the watchdog log (tail / follow / full, or the NSSM service logs).",
+    "category": "sessfix",
+    "runtime": {
+        "type": "shell",
+        "shell": "powershell",
+        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+        "script_path": "logs.ps1"
+    }
+}

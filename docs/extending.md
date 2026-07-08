@@ -19,7 +19,7 @@ wtf_rdp/
 │       └── <tool>/
 │           ├── .wtf-rdp.json     # tool manifest (dispatch)
 │           └── <tool>.ps1        # the script
-└── assets/                       # shared bundled scripts (the watchdog); NSSM is fetched by `rdp setup sessfix`
+└── assets/                       # shared bundled scripts (the watchdog); NSSM is fetched by `rdp install`
 ```
 
 ## Add a tool to an existing kit

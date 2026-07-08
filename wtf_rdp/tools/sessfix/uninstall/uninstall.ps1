@@ -3,18 +3,33 @@
     rdp uninstall (sessfix) — stop and remove the wtf-rdp watchdog service.
     Use -Purge to also delete the install directory.
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding=$false)]
 param(
+    [Alias('h')][switch] $Help,
     [string] $ServiceName = 'wtf-rdp-sessfix',
     [string] $InstallDir  = 'C:\ProgramData\wtf-rdp',
-    [switch] $Purge
+    [switch] $Purge,
+    [Parameter(ValueFromRemainingArguments=$true)] $Rest
 )
+if ($Help -or ($Rest | Where-Object { $_ -match '^(--?help|/\?)$' })) {
+    Write-Host @"
+rdp uninstall -- stop and remove the wtf-rdp watchdog service.
+
+Usage: rdp uninstall [-Purge]
+
+  -Purge   also delete the install dir (C:\ProgramData\wtf-rdp)
+
+Requires an elevated (Administrator) shell.
+"@
+    return
+}
 $ErrorActionPreference = 'Stop'
 function Info($m){ Write-Host "[wtf-rdp] $m" }
+function Fail($m){ Write-Host "[wtf-rdp] $m" -ForegroundColor Yellow; exit 1 }
 
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
         [Security.Principal.WindowsBuiltinRole]::Administrator)) {
-    throw "Administrator required (removing a service). Re-run from an elevated shell."
+    Fail "Administrator required (removing a service). Re-run from an elevated shell."
 }
 
 $nssm = Join-Path $InstallDir 'nssm.exe'
