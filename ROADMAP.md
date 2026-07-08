@@ -1,6 +1,6 @@
 # Roadmap
 
-Living roadmap: [Issue #1](https://github.com/djdarcy/wtf-rdp/issues/1) (to be created).
+Living roadmap: [Issue #1](https://github.com/djdarcy/wtf-rdp/issues/1).
 
 | Phase | Focus | Status |
 |---|---|---|
