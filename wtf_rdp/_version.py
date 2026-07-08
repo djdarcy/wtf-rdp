@@ -18,14 +18,14 @@ Version levels:
 # Version components - edit these for version bumps
 MAJOR = 0
 MINOR = 3
-PATCH = 1
+PATCH = 2
 PHASE = ""  # Per-MINOR feature set: None, "alpha", "beta", "rc1", etc.
 
 # Project-level phase (independent of version phase)
 PROJECT_PHASE = ""  # "prealpha", "alpha", "beta", "stable", or ""
 
 # Auto-updated by git hooks - do not edit manually
-__version__ = "0.3.1_main_12-20260708-d0562ca7"
+__version__ = "0.3.2_main_13-20260708-bfe3410d"
 __app_name__ = "wtf-rdp"
 
 

@@ -60,6 +60,18 @@ def test_every_tool_script_handles_help(tool, script):
     assert "ValueFromRemainingArguments" in text, f"{tool}: no --help catch-all"
 
 
+def test_pyproject_packages_the_dotfile_manifests():
+    """Regression guard for the 0.3.1 packaging bug: the per-tool manifests are
+    named `.wtf-rdp.json` (leading dot), and setuptools' `*` glob skips dotfiles,
+    so `tools/**/*` alone drops every manifest from the wheel and the installed
+    CLI reports "No tools found". package-data MUST list the dotfile explicitly."""
+    text = (PKG.parent / "pyproject.toml").read_text(encoding="utf-8")
+    assert "tools/**/.wtf-rdp.json" in text, (
+        "pyproject package-data must explicitly include the leading-dot "
+        ".wtf-rdp.json manifests, or the built wheel ships no tool manifests."
+    )
+
+
 def test_cli_epilog_lists_all_tools(capsys):
     """`rdp -h` epilog should enumerate every registered tool."""
     from wtf_rdp.cli import main

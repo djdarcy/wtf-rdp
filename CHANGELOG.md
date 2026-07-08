@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-08
+### Fixed
+- **Installed wheel found no tools** ("No tools found" / `rdp install` reported an invalid choice). The per-tool manifests are named `.wtf-rdp.json` (leading dot), and setuptools' `*` glob skips dotfiles, so `package-data`'s `tools/**/*` silently dropped every manifest from the wheel — the `.ps1` scripts shipped but not the manifests that dispatch them. Added an explicit `tools/**/.wtf-rdp.json` pattern, and a test that guards it. (0.3.0/0.3.1 were only usable from an editable/source checkout.)
+
 ## [0.3.1] - 2026-07-08
 ### Added
 - `release.yml` gains a `workflow_dispatch` trigger, so the PyPI build + publish can also be run manually from the Actions tab (in addition to firing on a published GitHub Release).
@@ -56,7 +60,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Bundled assets: the `SYSTEM` watchdog service script (`Watch-RdpSession.ps1`), the RDP auto-connect test clicker (`Invoke-RdpConnect.ps1`), and `nssm.exe` — shipped as package data toward a self-contained `pip install`.
 - Design record migrated to `private/` (postmortem, dev-workflow-process design, session-rescue watchdog design note) from the validation work on 2026-07-07: the `SYSTEM` `tscon` rescue mechanism and the autonomous detect→confirm→rescue loop, verified on a live target.
 
-[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/djdarcy/wtf-rdp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/djdarcy/wtf-rdp/compare/v0.1.2...v0.2.0

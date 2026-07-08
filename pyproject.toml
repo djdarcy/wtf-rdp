@@ -78,6 +78,10 @@ include = ["wtf_rdp", "wtf_rdp.*"]
 wtf_rdp = [
     "kits/*.json",
     "tools/**/*",
+    # The per-tool manifests are named `.wtf-rdp.json` (leading dot). setuptools'
+    # `*` glob skips dotfiles, so `tools/**/*` above silently drops them and the
+    # installed CLI finds no tools -- list them explicitly so the wheel includes them.
+    "tools/**/.wtf-rdp.json",
     "assets/*.ps1",
     "lib/*.psm1",
 ]
