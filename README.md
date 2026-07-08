@@ -9,13 +9,13 @@
 
 > **Rescue the RDP session Windows would make you destroy.**
 
-Windows RDP session-rescue tooling. A [wtf-windows](https://github.com/djdarcy/wtf-windows)-family CLI (`rdp`) built on the [DazzleCMD](https://github.com/DazzleTools/dazzlecmd) pattern that detects and non-destructively recovers RDP sessions wedged or blocked by Local Session Manager (LSM) -- the *"You're unable to sign in because you're already signed in to another session that is blocked"* failure that otherwise forces you to sign the session out and lose your work.
+Windows RDP session-rescue tooling. A [wtf-windows](https://github.com/djdarcy/wtf-windows)-family CLI (`rdp`) built on the [DazzleCMD](https://github.com/DazzleTools/dazzlecmd) pattern that detects and non-destructively recovers RDP sessions wedged or blocked by Local Session Manager (LSM). `wtf-rdp` handles the *"You're unable to sign in because you're already signed in to another session that is blocked"* failure that otherwise forces you to sign the session out and lose your work.
 
 ## Why wtf-rdp?
 
 Have you ever RDP'd into a machine, had the connection drop ungracefully, and then found yourself locked out of your own session with Windows offering only to sign-out (and destroy) the very session holding your unsaved work?
 
-That's the Local Session Manager block. An ungraceful `mstsc` disconnect can flag your session "blocked by Local Session Manager," after which Windows refuses *every* sign-in (RDP and the physical console) and the only button it gives you is the one that throws your work away. On client Windows (single interactive session), you can't even spin up a second session to fix it. The block counter climbs and never expires.
+That's the Local Session Manager block. An ungraceful `mstsc` disconnect can flag your session "blocked by Local Session Manager" after which Windows refuses *every* sign-in (RDP and the physical console) and the only button it gives you is the one that throws your work away. On client Windows (single interactive session), you can't even spin up a second session to fix it. The block counter climbs and never expires.
 
 Enter `wtf-rdp`...
 
@@ -27,14 +27,14 @@ wtf-rdp installs a tiny `SYSTEM` watchdog service (hosted by NSSM as LocalSystem
 - **Autonomous watchdog**: a `SYSTEM` service detects the wedge and rescues it on its own, before Windows can destroy the session
 - **No OS changes required**: runs as LocalSystem; no `LocalAccountTokenFilterPolicy`, no enabled built-in Administrator, no weakened token model
 - **Event-driven detection**: keys on the real LSM wedge signature (not just "disconnected"), so it acts on genuine blocks and stays silent on normal idle disconnects
-- **Real Windows service**: NSSM hosts the watchdog as a `LocalSystem` service you can query and control with standard tooling (`Get-Service`, `services.msc`); `rdp setup sessfix` fetches a checksum-verified NSSM, so the wheel stays pure Python (no bundled binaries)
+- **Real Windows service**: NSSM hosts the watchdog as a `LocalSystem` service you can query and control with standard tooling (`Get-Service`, `services.msc`); `rdp setup sessfix` fetches a checksum-verified NSSM, so the PyPi wheel stays pure Python (no bundled binaries)
 - **DazzleCMD aggregator**: `rdp <tool> [args]` works anywhere; tools grow as additional kits without changing the CLI
 
 ## Installation
 
 ```bash
 pip install wtf-rdp
-rdp setup sessfix        # bootstrap the LocalSystem watchdog service
+rdp install              # deploy + start the LocalSystem watchdog service
 ```
 
 **On externally-managed Python** (PEP 668), install into a virtual environment or use [pipx](https://pipx.pypa.io):
@@ -60,10 +60,10 @@ rdp list
 # Watchdog service state, recent rescues, and the live session table
 rdp status
 
-# (planned) install / manage the watchdog and recover a wedged session
-rdp setup sessfix         # register the LocalSystem watchdog service
+# install / manage the watchdog and recover a wedged session
+rdp install               # deploy + start the LocalSystem watchdog service
 rdp recover               # manual one-shot safe rescue (tscon + lock)
-rdp logs                  # tail the watchdog log
+rdp uninstall             # stop + remove the service
 
 # Detailed info about a tool
 rdp info status
@@ -78,7 +78,7 @@ rdp --version
 
 wtf-rdp ships one always-active kit today, with more categories planned:
 
-- **sessfix** (always active) -- session-fix tools for the LSM block: `status` *(shipping)*; `install`/`uninstall`, `recover`, `query`, `logs`, `config` *(planned)*
+- **sessfix** (always active) -- session-fix tools for the LSM block: `status`, `install`, `recover`, `uninstall` *(shipping)*; `query`, `logs`, `config` *(planned)*
 - **diagnose**, **keepalive** *(future kits)* -- attach as additional kits without changing the CLI
 
 Run `rdp list` to see what's active on your machine.
@@ -87,15 +87,15 @@ Run `rdp list` to see what's active on your machine.
 
 wtf-rdp targets one specific Windows failure and recovers from it *without destroying your session*.
 
-**The failure.** When an RDP connection drops ungracefully, Windows can leave the session wedged and Local Session Manager flags it "blocked." From then on every sign-in -- RDP *and* the physical console -- is refused, and the only recovery Windows offers is to *sign the session out*, which kills everything running in it. The block never times out on its own, and on client Windows (single interactive session) you can't even open a second session to fix it.
+**The failure.** When an RDP connection drops ungracefully, Windows can leave the session in a corrupted state that we call a "wedge" and Local Session Manager flags it "blocked." From then on every sign-in (RDP *and* the physical console) is refused, and the only recovery Windows offers is to sign the session out, which kills everything running in it. The block never times out on its own, and on client Windows (single interactive session) you can't even open a second session to fix it.
 
-**Detection.** A wedge looks, to a naive check, exactly like a healthy machine sitting at its login screen -- so wtf-rdp does *not* act on "a session is disconnected." It watches for the real wedge signature: a **console session stuck in the connecting state**, corroborated by the **Local Session Manager transition-failure event** a dirty disconnect emits. It then waits a short **confirm window**; transitions that resolve on their own are ignored, so a normal idle disconnect never triggers a rescue.
+**Detection.** A wedge looks, to a naive check, exactly like a healthy machine sitting at its login screen -- so wtf-rdp does *not* act on "a session is disconnected." It watches for a wedge signature: a console session stuck in the connecting state, corroborated by the Local Session Manager transition-failure event a dirty disconnect emits. It then waits a short confirm window; transitions that resolve on their own are ignored, so a normal idle disconnect never triggers a rescue.
 
-**Recovery.** Once a wedge is confirmed, wtf-rdp reconnects the stranded session with **`tscon`** -- it *reconnects*, never signs out, so every process in the session keeps running. The rescue runs as **`SYSTEM`** because reconnecting another user's session needs `SeTcbPrivilege`, which only `SYSTEM` holds -- which is why **nothing about the machine's admin accounts or token policy has to change**. Immediately after reconnecting, the session is left **locked** (not an open desktop), so a recovered box is never left exposed.
+**Recovery.** Once a wedge is confirmed, wtf-rdp reconnects the stranded session with **`tscon`**. wtf-rdp *reconnects*, never signs out, so every process in the session keeps running. The rescue runs as **`SYSTEM`** because reconnecting another user's session needs `SeTcbPrivilege`, which only `SYSTEM` holds. This is why nothing about the machine's admin accounts or token policy has to change. Immediately after reconnecting, the session is left locked (not an open desktop), so a recovered box is never left exposed.
 
-**Where it runs.** The rescue logic is a small PowerShell watchdog (`Watch-RdpSession.ps1`) hosted by **NSSM as a LocalSystem service**, so it keeps watching across reboots and can act even when nobody is logged in. `rdp setup sessfix` installs it; `rdp status` / `rdp recover` drive it.
+**Where it runs.** The rescue logic is a small PowerShell watchdog (`Watch-RdpSession.ps1`) hosted by NSSM as a LocalSystem service, so it keeps watching across reboots and can act even when nobody is logged in. `rdp install` installs it; `rdp status` / `rdp recover` drive it.
 
-Want to add your own tools or a new kit? See **[Extending wtf-rdp](docs/extending.md)**.
+Want to add your own RDP tools or a new kit? See **[Extending wtf-rdp](docs/extending.md)**.
 
 ## Project Structure
 

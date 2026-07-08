@@ -79,6 +79,7 @@ wtf_rdp = [
     "kits/*.json",
     "tools/**/*",
     "assets/*.ps1",
+    "lib/*.psm1",
 ]
 
 [tool.pytest.ini_options]
