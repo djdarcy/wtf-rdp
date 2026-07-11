@@ -84,7 +84,7 @@ function Get-WtfRdpWedgeEventSid {
     foreach($e in $ev){ try { $xml=[xml]$e.ToXml()
         $sid=($xml.Event.EventData.Data|Where-Object{$_.Name -eq 'SessionId'}).'#text'
         if($null -ne $sid){ $sids += [int]$sid } } catch {} }
-    ,($sids|Select-Object -Unique)
+    @($sids | Select-Object -Unique)   # flat array (was ,(...) which double-wrapped -> "System.Object[]" in logs)
 }
 
 function Lock-WtfRdpSession {
@@ -116,12 +116,41 @@ function Lock-WtfRdpSession {
     }
 }
 
+function Get-WtfRdpVerifyVerdict {
+    <#.SYNOPSIS Pure verdict for the AC1 verification gate: given tscon's success and the sequence
+    of session StateNames observed during the verify window, decide whether the reconnect HELD.
+    Extracted with NO session/tscon calls so it is unit-testable. 'Gone' counts as a disconnect.
+    Verified = reached Active/Connected AND did not fall back to Disconnected/Gone.#>
+    param([bool]$TsconOk, [int]$VerifySec, [string[]]$ObservedStates = @())
+    $sawActive = $false; $decayed = $false; $finalState = $null
+    if ($TsconOk -and $VerifySec -gt 0) {
+        foreach ($st in $ObservedStates) {
+            $finalState = $st
+            if ($st -in @('Active','Connected')) { $sawActive = $true }
+            elseif ($sawActive -and $st -in @('Disconnected','Gone')) { $decayed = $true; break }
+        }
+    }
+    $verified = ($TsconOk -and $sawActive -and -not $decayed -and ($finalState -in @('Active','Connected')))
+    $status = if (-not $TsconOk)        { 'tscon-failed' }
+              elseif ($VerifySec -le 0) { 'unverified' }
+              elseif ($verified)        { 'recovered-held' }
+              elseif ($decayed)         { 'decayed' }                  # hardened LSM-block signature
+              elseif (-not $sawActive)  { 'reconnect-not-observed' }
+              else                      { 'unconfirmed' }
+    [pscustomobject]@{ Verified=$verified; Decayed=$decayed; SawActive=$sawActive; FinalState=$finalState; Status=$status }
+}
+
 function Invoke-WtfRdpRescue {
     <#.SYNOPSIS Non-destructively rescue a stranded session: reconnect it to the console with
-    tscon, then LOCK it so the box is never left open. Returns a result object.#>
+    tscon, LOCK it, then VERIFY the reconnect actually HELD. tscon's exit code alone lies -- a
+    session under a hardened LSM block reconnects to Active, then decays back to Disconnected
+    (seen ~2 min later, or on the next real client connect). Only a session that reaches
+    Active/Connected AND stays there through VerifySec is truly Verified. Returns a result object.#>
     param(
         [Parameter(Mandatory)][int]$SessionId,
-        [switch]$NoLock
+        [switch]$NoLock,
+        [int]$VerifySec = 20,        # AC1: seconds to confirm the reconnect holds (0 = skip, legacy behavior)
+        [int]$VerifyPollMs = 1500
     )
     $out = & tscon.exe $SessionId /dest:console 2>&1
     $tsconOk = ($LASTEXITCODE -eq 0)
@@ -130,12 +159,34 @@ function Invoke-WtfRdpRescue {
         Start-Sleep -Milliseconds 800   # let the session finish attaching before we lock it
         $locked = Lock-WtfRdpSession -SessionId $SessionId
     }
+
+    # AC1 verification gate: do NOT trust tscon's exit code. Poll the session, collect observed
+    # states, and let Get-WtfRdpVerifyVerdict decide whether the reconnect reached Active and HELD.
+    # A decay (Active -> Disconnected/Gone) is the hardened-LSM-block signature tscon cannot clear.
+    $observed = @()
+    if ($tsconOk -and $VerifySec -gt 0) {
+        $deadline = (Get-Date).AddSeconds($VerifySec)
+        while ($true) {
+            $s = Get-WtfRdpSession | Where-Object { $_.Id -eq $SessionId } | Select-Object -First 1
+            $observed += $(if ($null -eq $s) { 'Gone' } else { $s.StateName })
+            if ((Get-WtfRdpVerifyVerdict -TsconOk $tsconOk -VerifySec $VerifySec -ObservedStates $observed).Decayed) { break }
+            if ((Get-Date) -ge $deadline) { break }
+            Start-Sleep -Milliseconds $VerifyPollMs
+        }
+    }
+    $v = Get-WtfRdpVerifyVerdict -TsconOk $tsconOk -VerifySec $VerifySec -ObservedStates $observed
+    $verified = $v.Verified; $finalState = $v.FinalState; $status = $v.Status
+
     [pscustomobject]@{
-        SessionId = $SessionId
-        Reconnected = $tsconOk
-        Locked = $locked
+        SessionId   = $SessionId
+        Reconnected = $tsconOk          # tscon exit code (kept for back-compat)
+        Verified    = $verified         # AC1: the reconnect reached Active and HELD through VerifySec
+        Locked      = $locked
+        FinalState  = $finalState
+        Status      = $status
+        VerifySec   = $VerifySec
         TsconOutput = ("$out").Trim()
     }
 }
 
-Export-ModuleMember -Function Get-WtfRdpSession, Get-WtfRdpWedgeEventSid, Lock-WtfRdpSession, Invoke-WtfRdpRescue
+Export-ModuleMember -Function Get-WtfRdpSession, Get-WtfRdpWedgeEventSid, Lock-WtfRdpSession, Get-WtfRdpVerifyVerdict, Invoke-WtfRdpRescue

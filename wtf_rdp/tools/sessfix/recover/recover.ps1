@@ -72,15 +72,27 @@ $argstr = "-NoProfile -ExecutionPolicy Bypass -File `"$self`" -AsSystem -Session
 $act  = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argstr
 Register-ScheduledTask -TaskName 'WtfRdpRecover' -Action $act -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
 Start-ScheduledTask -TaskName 'WtfRdpRecover'
-$deadline = (Get-Date).AddSeconds(25)
+# Wait long enough for the SYSTEM task's tscon + AC1 verification poll (~VerifySec) + lock.
+$deadline = (Get-Date).AddSeconds(50)
 while ((Get-Date) -lt $deadline -and -not (Test-Path $rf)) { Start-Sleep -Milliseconds 400 }
 Start-Sleep 1
 Unregister-ScheduledTask -TaskName 'WtfRdpRecover' -Confirm:$false
 if (Test-Path $rf) {
     $res = Get-Content $rf -Raw | ConvertFrom-Json
     [System.IO.File]::Delete($rf)
-    if ($res.Reconnected) { Write-Host "[wtf-rdp] Recovered session $($res.SessionId): reconnected, locked=$($res.Locked)." }
-    else { Write-Host "[wtf-rdp] Recovery failed: $($res.error)$($res.TsconOutput)" }
+    if ($res.error) {
+        Write-Host "[wtf-rdp] Recovery failed: $($res.error)" -ForegroundColor Yellow
+    } elseif ($res.Verified) {
+        Write-Host "[wtf-rdp] Recovered session $($res.SessionId): reconnected and HELD $($res.VerifySec)s, locked=$($res.Locked)."
+        Write-Host "[wtf-rdp] (If a client connect still shows 'blocked by Local Session Manager', it's a hardened LSM block -- tscon can't clear that; a reboot/logoff or prevention is required.)" -ForegroundColor DarkGray
+    } elseif ($res.Reconnected -and $res.Status -eq 'decayed') {
+        Write-Host "[wtf-rdp] NOT recovered: session $($res.SessionId) reconnected but DECAYED back to disconnected (final=$($res.FinalState))." -ForegroundColor Yellow
+        Write-Host "[wtf-rdp] That is the hardened LSM-block signature -- tscon cannot clear it. Reboot/logoff, or apply prevention." -ForegroundColor Yellow
+    } elseif ($res.Reconnected) {
+        Write-Host "[wtf-rdp] Reconnect UNCONFIRMED for session $($res.SessionId) (status=$($res.Status), final=$($res.FinalState)); could not verify it held." -ForegroundColor Yellow
+    } else {
+        Write-Host "[wtf-rdp] Recovery failed (tscon): $($res.TsconOutput)" -ForegroundColor Yellow
+    }
 } else {
     Write-Host "[wtf-rdp] Recovery timed out (no result from the SYSTEM task)."
 }

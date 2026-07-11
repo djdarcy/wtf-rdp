@@ -90,10 +90,14 @@ function Invoke-WatchdogPass {
 
     $res = Invoke-WtfRdpRescue -SessionId $t.Id
     $script:lastReconnect[$t.Id] = Get-Date
-    if ($res.Reconnected) {
-        Write-Log "RESCUE OK: session $($t.Id) ($($t.User)) reconnected; locked=$($res.Locked)." 'ACTION'
+    if ($res.Verified) {
+        Write-Log "RESCUE OK: session $($t.Id) ($($t.User)) reconnected and HELD $($res.VerifySec)s; locked=$($res.Locked)." 'ACTION'
         if (-not $res.Locked) { Write-Log "WARNING: reconnected but lock failed -- session may be exposed." 'WARN' }
-        $script:wedgeSince = $null
+        $script:wedgeSince = $null   # clear the wedge watch only when the reconnect actually held
+    } elseif ($res.Reconnected -and $res.Status -eq 'decayed') {
+        Write-Log "RESCUE INEFFECTIVE: session $($t.Id) reconnected but DECAYED back to disconnected -- hardened LSM block (tscon cannot clear it; needs reboot/prevention). Will retry after cooldown." 'ERROR'
+    } elseif ($res.Reconnected) {
+        Write-Log "RESCUE UNCONFIRMED: session $($t.Id) tscon ok but not verified (status=$($res.Status), final=$($res.FinalState))." 'WARN'
     } else {
         Write-Log "RESCUE FAILED (tscon): $($res.TsconOutput)" 'ERROR'
     }

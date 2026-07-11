@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-07-11
+### Fixed
+- **Recovery could falsely report success.** `Invoke-WtfRdpRescue` trusted `tscon`'s exit code (0), but a session under a hardened Local Session Manager block reconnects to the console and then decays back to *Disconnected* within ~2 minutes — so `rdp recover` reported "reconnected, locked=True" and the watchdog logged "RESCUE OK" for a rescue that never held. Added a verification gate: after `tscon`, the rescue polls the session and reports success (`Verified`) only if it reaches Active/Connected **and stays there** through a window (default 20s). `rdp recover` and the watchdog now distinguish *recovered-and-held* from *decayed (hardened LSM block — needs reboot/prevention)* / *unconfirmed* / *failed*. Validated live: a reproduced Event-36 wedge now logs `RESCUE INEFFECTIVE ... DECAYED` instead of a false `RESCUE OK`.
+- `Get-WtfRdpWedgeEventSid` returned a double-wrapped array, so wedge-candidate log lines printed `sids: System.Object[]` instead of the session ids.
+### Added
+- `Get-WtfRdpVerifyVerdict` (pure, exported) — the verdict logic behind the verification gate, with a Pester test (`tests/one-offs/test-ac1-verify-verdict.Tests.ps1`, 8 cases).
+
 ## [0.3.2] - 2026-07-08
 ### Fixed
 - **Installed wheel found no tools** ("No tools found" / `rdp install` reported an invalid choice). The per-tool manifests are named `.wtf-rdp.json` (leading dot), and setuptools' `*` glob skips dotfiles, so `package-data`'s `tools/**/*` silently dropped every manifest from the wheel — the `.ps1` scripts shipped but not the manifests that dispatch them. Added an explicit `tools/**/.wtf-rdp.json` pattern, and a test that guards it. (0.3.0/0.3.1 were only usable from an editable/source checkout.)
@@ -60,7 +67,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Bundled assets: the `SYSTEM` watchdog service script (`Watch-RdpSession.ps1`), the RDP auto-connect test clicker (`Invoke-RdpConnect.ps1`), and `nssm.exe` — shipped as package data toward a self-contained `pip install`.
 - Design record migrated to `private/` (postmortem, dev-workflow-process design, session-rescue watchdog design note) from the validation work on 2026-07-07: the `SYSTEM` `tscon` rescue mechanism and the autonomous detect→confirm→rescue loop, verified on a live target.
 
-[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/djdarcy/wtf-rdp/compare/v0.2.0...v0.3.0

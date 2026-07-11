@@ -19,7 +19,7 @@ That's the Local Session Manager block. An ungraceful `mstsc` disconnect can fla
 
 Enter `wtf-rdp`...
 
-wtf-rdp installs a tiny `SYSTEM` watchdog service (hosted by NSSM as LocalSystem) that watches for the wedge signature (a console session stuck connecting, corroborated by the LSM transition-failure event) and reconnects the stranded session via `tscon` before Windows can garbage-collect it. 
+wtf-rdp installs a tiny `SYSTEM` watchdog service (hosted by NSSM as LocalSystem) that watches for the wedge signature (a console session stuck connecting, corroborated by the LSM transition-failure event) and reconnects + locks the stranded session via `tscon` -- then verifies the reconnect actually held (a fully hardened LSM block can't be cleared by `tscon`; the watchdog reports that instead of a false success). 
 
 ## Features
 
@@ -127,7 +127,9 @@ wtf-rdp targets one specific Windows failure and recovers from it *without destr
 
 **Detection.** A wedge looks, to a naive check, exactly like a healthy machine sitting at its login screen -- so wtf-rdp does *not* act on "a session is disconnected." It watches for a wedge signature: a console session stuck in the connecting state, corroborated by the Local Session Manager transition-failure event a dirty disconnect emits. It then waits a short confirm window; transitions that resolve on their own are ignored, so a normal idle disconnect never triggers a rescue.
 
-**Recovery.** Once a wedge is confirmed, wtf-rdp reconnects the stranded session with **`tscon`**. wtf-rdp *reconnects*, never signs out, so every process in the session keeps running. The rescue runs as **`SYSTEM`** because reconnecting another user's session needs `SeTcbPrivilege`, which only `SYSTEM` holds. This is why nothing about the machine's admin accounts or token policy has to change. Immediately after reconnecting, the session is left locked (not an open desktop), so a recovered box is never left exposed.
+**Recovery.** Once a wedge is confirmed, wtf-rdp reconnects the stranded session with **`tscon`** -- never a sign-out, so every process keeps running -- and leaves it **locked**, so a recovered box is never an open desktop. The rescue runs as **`SYSTEM`** because reconnecting another user's session needs `SeTcbPrivilege`, which only `SYSTEM` holds; this is why nothing about the machine's admin accounts or token policy has to change.
+
+**`tscon` is not a cure-all, and wtf-rdp is clear about it.** After reconnecting, the watchdog *verifies the reconnect actually held*. A lightly-wedged session reconnects and stays put -- a real recovery. But a session under a *fully hardened* LSM block reconnects to the console and then decays back to disconnected within a couple of minutes: `tscon` cannot clear that, and only a reboot (or preventing the wedge up front) will. wtf-rdp reports which case it hit -- `recovered (held)` vs. `reconnected but decayed (hardened block -> reboot needed)` -- rather than claiming a success that didn't stick.
 
 **Where it runs.** The rescue logic is a small PowerShell watchdog (`Watch-RdpSession.ps1`) hosted by NSSM as a LocalSystem service, so it keeps watching across reboots and can act even when nobody is logged in. `rdp install` installs it; `rdp status` / `rdp recover` drive it.
 
