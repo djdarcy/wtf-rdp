@@ -1,11 +1,17 @@
 {
     "name": "config",
+    "version": "0.3.0",
     "description": "Show or change the watchdog parameters (poll interval, confirm window, target user).",
     "category": "sessfix",
     "runtime": {
         "type": "shell",
         "shell": "powershell",
-        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+        "shell_args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File"
+        ],
         "script_path": "config.ps1"
     }
 }

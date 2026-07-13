@@ -22,6 +22,7 @@ EXPECTED_TOOLS = {
     "logs": "logs.ps1",
     "config": "config.ps1",
     "uninstall": "uninstall.ps1",
+    "test": "test.ps1",
 }
 
 

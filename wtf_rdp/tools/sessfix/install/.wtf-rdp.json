@@ -1,11 +1,17 @@
 {
     "name": "install",
+    "version": "0.3.0",
     "description": "Install the wtf-rdp watchdog as an NSSM LocalSystem service (downloads a checksum-verified NSSM if needed).",
     "category": "sessfix",
     "runtime": {
         "type": "shell",
         "shell": "powershell",
-        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+        "shell_args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File"
+        ],
         "script_path": "install.ps1"
     }
 }

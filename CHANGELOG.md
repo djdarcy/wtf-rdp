@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-12
+### Added
+- **LSM session-arbitration-block detector** — `Get-WtfRdpArbitrationVerdict` (pure, unit-testable) + `Get-WtfRdpArbitrationBlock` (live/evtx wrapper) in `lib/WtfRdp.Sessions.psm1`. Detects the REAL reboot/logoff-only block: a *stuck arbitration* (Operational `Id=41` "Begin session arbitration" with no completing `Id=42`), which is a **different** failure from Event 36 (the shipped watchdog keys on Event 36 and is structurally blind to this). Never trusts `qwinsta` "Active". Verified (AC-D1) against the real captured block's `.evtx`: `Blocked=true` in the incident window, `false` before/after. Pester test `tests/one-offs/test-arbitration-verdict.Tests.ps1` (8 cases).
+- **`sessfix:test`** — a two-machine reproducer/detector for the arbitration block. `rdp test client -RdpHost <server>` storms a server with overlapping reconnects and reads the verdict on the server over WinRM; `rdp test server` detects the block on the local host. Loopback is deliberately unsupported (shortcuts the TCP stack; unverified for this bug). **WIP:** the storm reliably *triggers* the block, but a 100%-repeatable *persistent* strand is still being finalized (l#22).
+- **Per-tool `version` field** in every `.wtf-rdp.json` manifest, surfaced by `rdp info <tool>` (mature tools `0.3.0`; the WIP `test` tool `0.1.0`).
+### Known
+- The arbitration detector's sibling count is parsed from LSM message text and **undercounts** a live storm's session pileup (fix — count the live session table — tracked as l#13; the `test` tool's host-side detection already counts the session table).
+
 ## [0.3.3] - 2026-07-11
 ### Fixed
 - **Recovery could falsely report success.** `Invoke-WtfRdpRescue` trusted `tscon`'s exit code (0), but a session under a hardened Local Session Manager block reconnects to the console and then decays back to *Disconnected* within ~2 minutes — so `rdp recover` reported "reconnected, locked=True" and the watchdog logged "RESCUE OK" for a rescue that never held. Added a verification gate: after `tscon`, the rescue polls the session and reports success (`Verified`) only if it reaches Active/Connected **and stays there** through a window (default 20s). `rdp recover` and the watchdog now distinguish *recovered-and-held* from *decayed (hardened LSM block — needs reboot/prevention)* / *unconfirmed* / *failed*. Validated live: a reproduced Event-36 wedge now logs `RESCUE INEFFECTIVE ... DECAYED` instead of a false `RESCUE OK`.
@@ -67,7 +75,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Bundled assets: the `SYSTEM` watchdog service script (`Watch-RdpSession.ps1`), the RDP auto-connect test clicker (`Invoke-RdpConnect.ps1`), and `nssm.exe` — shipped as package data toward a self-contained `pip install`.
 - Design record migrated to `private/` (postmortem, dev-workflow-process design, session-rescue watchdog design note) from the validation work on 2026-07-07: the `SYSTEM` `tscon` rescue mechanism and the autonomous detect→confirm→rescue loop, verified on a live target.
 
-[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/djdarcy/wtf-rdp/compare/v0.4.0...HEAD
 [0.3.3]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/djdarcy/wtf-rdp/compare/v0.3.0...v0.3.1

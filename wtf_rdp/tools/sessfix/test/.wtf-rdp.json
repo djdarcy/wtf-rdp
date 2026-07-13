@@ -1,7 +1,7 @@
 {
-    "name": "query",
-    "version": "0.3.0",
-    "description": "Enumerate sessions and flag stranded / wedge candidates (read-only diagnostic).",
+    "name": "test",
+    "version": "0.1.0",
+    "description": "Reproduce the LSM arbitration block on a throwaway session to check vulnerability + validate the fix (DANGEROUS).",
     "category": "sessfix",
     "runtime": {
         "type": "shell",
@@ -12,6 +12,6 @@
             "Bypass",
             "-File"
         ],
-        "script_path": "query.ps1"
+        "script_path": "test.ps1"
     }
 }

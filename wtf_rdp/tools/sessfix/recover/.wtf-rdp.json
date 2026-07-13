@@ -1,11 +1,17 @@
 {
     "name": "recover",
+    "version": "0.3.0",
     "description": "Manual one-shot safe rescue: reconnect + lock a stranded RDP session now (self-elevates to SYSTEM).",
     "category": "sessfix",
     "runtime": {
         "type": "shell",
         "shell": "powershell",
-        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+        "shell_args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File"
+        ],
         "script_path": "recover.ps1"
     }
 }

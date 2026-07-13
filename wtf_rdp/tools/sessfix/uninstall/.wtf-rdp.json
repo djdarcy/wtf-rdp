@@ -1,11 +1,17 @@
 {
     "name": "uninstall",
+    "version": "0.3.0",
     "description": "Stop and remove the wtf-rdp watchdog service (-Purge to also delete the install dir).",
     "category": "sessfix",
     "runtime": {
         "type": "shell",
         "shell": "powershell",
-        "shell_args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+        "shell_args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File"
+        ],
         "script_path": "uninstall.ps1"
     }
 }

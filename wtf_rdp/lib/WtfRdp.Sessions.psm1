@@ -140,6 +140,99 @@ function Get-WtfRdpVerifyVerdict {
     [pscustomobject]@{ Verified=$verified; Decayed=$decayed; SawActive=$sawActive; FinalState=$finalState; Status=$status }
 }
 
+function Get-WtfRdpArbitrationVerdict {
+    <#.SYNOPSIS Pure verdict for the REAL reboot/logoff-only block: a STUCK LSM SESSION
+    ARBITRATION (Operational Id=41 "Begin session arbitration" with no completing Id=42 "End
+    session arbitration"), corroborated by a colliding session table and/or a refused fresh
+    connection. Given the count of stuck arbitrations, the number of distinct sibling session
+    ids in play, and whether a fresh-connection probe was refused, decide if the box is blocked.
+    Pure (no event/session/UI calls) so it is unit-testable, mirroring Get-WtfRdpVerifyVerdict.
+    NOTE: this is NOT Event 36 -- that is a separate, recoverable stage-1 wedge.#>
+    param(
+        [int]$StuckArbitrations,
+        [int]$SiblingCount,
+        $ProbeRefused = $null,        # $true/$false = probe ran; $null = probe not run
+        [int]$MinSiblings = 2          # ground truth: the real STAGE2 block window referenced 2 sibling
+                                       # sessions (5,6) in the LSM log, not 3 -- a stuck Id=41 is the
+                                       # necessary signal; siblings/probe only corroborate it.
+    )
+    # The stuck Id=41 arbitration is the primary signal. A colliding session table (>= MinSiblings
+    # sibling sessions) OR a refused fresh-connection probe corroborates it. The probe is the
+    # STRONGEST evidence: state lies (a blocked session shows qwinsta "Active"), function tells the
+    # truth (a fresh connection cannot attach).
+    $hasStuck  = ($StuckArbitrations -gt 0)
+    $collision = ($SiblingCount -ge $MinSiblings)
+    $refused   = ($ProbeRefused -eq $true)
+    $blocked = $hasStuck -and ($collision -or $refused)
+    $confidence = if     ($hasStuck -and $refused)   { 'confirmed' }   # function-verified: probe refused
+                  elseif ($hasStuck -and $collision) { 'high' }        # stuck arbitration + sibling pileup
+                  elseif ($hasStuck)                 { 'suspected' }    # stuck but no corroboration yet
+                  else                               { 'none' }
+    [pscustomobject]@{
+        Blocked           = $blocked
+        Confidence        = $confidence
+        StuckArbitrations = $StuckArbitrations
+        SiblingCount      = $SiblingCount
+        ProbeRefused      = $ProbeRefused
+    }
+}
+
+function Get-WtfRdpArbitrationBlock {
+    <#.SYNOPSIS Detect the REAL reboot/logoff-only block: a stuck LSM session arbitration
+    (Operational Id=41 "Begin session arbitration" with NO following Id=42 "End session
+    arbitration" within CompletionWindowSec), corroborated by multiple sibling sessions and
+    optionally a refused fresh-connection probe. Reads live or from a saved .evtx. Deliberately
+    does NOT trust qwinsta "Active" (it lies for a blocked session). Replaces the Event-36
+    trigger the shipped watchdog keyed on -- Event 36 never fires for this failure.#>
+    param(
+        [string]$EvtxPath,
+        [string]$LogName = 'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational',
+        [int]$LookbackMin = 20,
+        [int]$CompletionWindowSec = 90,
+        [datetime]$StartTime,          # optional explicit window (evtx replay / AC-D1); else LookbackMin
+        [datetime]$EndTime,
+        $ProbeRefused = $null
+    )
+    if ($EvtxPath) {
+        $ev = @(Get-WinEvent -Path $EvtxPath -Oldest -ErrorAction SilentlyContinue)
+    } else {
+        $lo = if ($PSBoundParameters.ContainsKey('StartTime')) { $StartTime } else { (Get-Date).AddMinutes(-$LookbackMin) }
+        $ev = @(Get-WinEvent -LogName $LogName -ErrorAction SilentlyContinue | Where-Object { $_.TimeCreated -ge $lo })
+    }
+    # Optional explicit window (both paths): scopes a saved log to one incident so historical
+    # Id=41s outside the window don't aggregate into a false "stuck" pile (the known lookback bug).
+    if ($PSBoundParameters.ContainsKey('StartTime')) { $ev = @($ev | Where-Object { $_.TimeCreated -ge $StartTime }) }
+    if ($PSBoundParameters.ContainsKey('EndTime'))   { $ev = @($ev | Where-Object { $_.TimeCreated -le $EndTime }) }
+    $ev = @($ev | Sort-Object TimeCreated)
+
+    # Id=41 = "Begin session arbitration"; Id=42 = "End session arbitration" (its direct completion).
+    # A stuck arbitration = an Id=41 with NO following Id=42 inside the window (verified against the
+    # real STAGE2 block: 1 begin / 0 end).
+    $arbs = @($ev | Where-Object { $_.Id -eq 41 } | Sort-Object TimeCreated)
+    $ends = @($ev | Where-Object { $_.Id -eq 42 } | Sort-Object TimeCreated)
+    $stuck = @()
+    foreach ($a in $arbs) {
+        $done = $ends | Where-Object {
+            $_.TimeCreated -gt $a.TimeCreated -and $_.TimeCreated -le $a.TimeCreated.AddSeconds($CompletionWindowSec)
+        }
+        if (-not $done) { $stuck += $a }
+    }
+    # sibling sessions = distinct session ids churning in the window (the collision substrate)
+    $sids = @($ev | ForEach-Object { if ($_.Message -match 'Session (\d+)') { [int]$matches[1] } } | Sort-Object -Unique)
+
+    $v = Get-WtfRdpArbitrationVerdict -StuckArbitrations $stuck.Count -SiblingCount $sids.Count -ProbeRefused $ProbeRefused
+    [pscustomobject]@{
+        Blocked           = $v.Blocked
+        Confidence        = $v.Confidence
+        StuckArbitrations = $stuck.Count
+        SiblingSessionIds = ($sids -join ',')
+        SiblingCount      = $sids.Count
+        ProbeRefused      = $ProbeRefused
+        Evidence          = if ($stuck) { "stuck arbitration (Id=41 no Id=42) @ " + (($stuck | ForEach-Object { $_.TimeCreated }) -join '; ') } else { "no stuck arbitration" }
+        Source            = if ($EvtxPath) { "evtx:$EvtxPath" } else { "live:$LogName" }
+    }
+}
+
 function Invoke-WtfRdpRescue {
     <#.SYNOPSIS Non-destructively rescue a stranded session: reconnect it to the console with
     tscon, LOCK it, then VERIFY the reconnect actually HELD. tscon's exit code alone lies -- a
@@ -189,4 +282,4 @@ function Invoke-WtfRdpRescue {
     }
 }
 
-Export-ModuleMember -Function Get-WtfRdpSession, Get-WtfRdpWedgeEventSid, Lock-WtfRdpSession, Get-WtfRdpVerifyVerdict, Invoke-WtfRdpRescue
+Export-ModuleMember -Function Get-WtfRdpSession, Get-WtfRdpWedgeEventSid, Lock-WtfRdpSession, Get-WtfRdpVerifyVerdict, Invoke-WtfRdpRescue, Get-WtfRdpArbitrationVerdict, Get-WtfRdpArbitrationBlock

@@ -13,7 +13,8 @@
         "sessfix:recover",
         "sessfix:logs",
         "sessfix:config",
-        "sessfix:uninstall"
+        "sessfix:uninstall",
+        "sessfix:test"
     ],
-    "notes": "First category of the wtf-rdp aggregator. Shipping: status (read-only), query (session diagnostic), install (NSSM LocalSystem watchdog service), recover (manual tscon + lock), logs (watchdog log viewer), config (get/set watchdog params), uninstall. The rescue logic lives in the shared lib/WtfRdp.Sessions.psm1 module."
+    "notes": "First category of the wtf-rdp aggregator. Shipping: status (read-only), query (session diagnostic), install (NSSM LocalSystem watchdog service), recover (manual tscon + lock), logs (watchdog log viewer), config (get/set watchdog params), uninstall, test (reproduce the LSM arbitration block on a throwaway session + validate the fix; DANGEROUS). The rescue + arbitration-detection logic lives in the shared lib/WtfRdp.Sessions.psm1 module."
 }
