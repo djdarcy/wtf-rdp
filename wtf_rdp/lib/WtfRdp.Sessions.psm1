@@ -140,6 +140,37 @@ function Get-WtfRdpVerifyVerdict {
     [pscustomobject]@{ Verified=$verified; Decayed=$decayed; SawActive=$sawActive; FinalState=$finalState; Status=$status }
 }
 
+function Get-WtfRdpBlockScreenVerdict {
+    <#.SYNOPSIS Pure verdict for the CLIENT-SIDE visual block check. The LSM block message ("Session
+    blocked by: Local Session Manager") is drawn in the REMOTE RDP framebuffer (a bitmap, not a Win32
+    control), so the tool captures the session window's client area and reduces it to two numbers:
+    PURE-BLACK coverage (% of pixels below the title bar with luminance < 15) and the % of bright/white
+    pixels in the lower half (the message text). This decides whether that capture is the block screen.
+    A ratio guard, NOT an absolute luminance cutoff: the block screen is a large near-pure-black field
+    (~97% pure black) with white text; a dark editor (Sublime / VS Code) is dark-GREY (~0-5% pure black)
+    so it can never reach MinPureBlack no matter how dark its theme. Pure -> unit-testable.#>
+    param(
+        [double]$PureBlackPct,          # % of the captured area (below title) that is near-pure-black (lum < 15)
+        [double]$LowerBrightPct,        # % of bright (white text) pixels in the lower half
+        [double]$MinPureBlack = 70,     # block screen ~97%; a dark editor ~0-5% -- can't reach 70
+        [double]$MinLowerText = 0.1     # require some white text (a plain black screen is not the block screen)
+    )
+    [bool]($PureBlackPct -ge $MinPureBlack -and $LowerBrightPct -gt $MinLowerText)
+}
+
+function Get-WtfRdpSiblingCount {
+    <#.SYNOPSIS Pure: count distinct sibling RDP sessions -- the collision substrate for the
+    arbitration block. The LSM log message text alone UNDERCOUNTS (a storm piles up sessions the
+    arbitration messages never name -- observed rdp-tcp# sessions 11/12/13 on 2026-07-12 while the
+    log named only "Session 3"), so the live session table is authoritative when available. Union
+    of the session-table ids and the log-referenced ids, de-duplicated. No live calls -> testable.#>
+    param(
+        [int[]]$SessionIds    = @(),   # from the live session table (Get-WtfRdpSession rdp-tcp# ids)
+        [int[]]$LogSessionIds = @()    # parsed from LSM event message text
+    )
+    @(@($SessionIds) + @($LogSessionIds) | Sort-Object -Unique).Count
+}
+
 function Get-WtfRdpArbitrationVerdict {
     <#.SYNOPSIS Pure verdict for the REAL reboot/logoff-only block: a STUCK LSM SESSION
     ARBITRATION (Operational Id=41 "Begin session arbitration" with no completing Id=42 "End
@@ -217,16 +248,25 @@ function Get-WtfRdpArbitrationBlock {
         }
         if (-not $done) { $stuck += $a }
     }
-    # sibling sessions = distinct session ids churning in the window (the collision substrate)
-    $sids = @($ev | ForEach-Object { if ($_.Message -match 'Session (\d+)') { [int]$matches[1] } } | Sort-Object -Unique)
+    # Sibling sessions = the collision substrate. Log message text alone UNDERCOUNTS (a storm piles
+    # up sessions the arbitration messages never name), so for a LIVE read we also count the rdp-tcp#
+    # sessions in the live session table (authoritative). An evtx replay has no live table -> it
+    # falls back to the log-referenced ids (preserving AC-D1 behavior against saved captures).
+    $logSids = @($ev | ForEach-Object { if ($_.Message -match 'Session (\d+)') { [int]$matches[1] } })
+    $tableSids = @()
+    if (-not $EvtxPath) {
+        try { $tableSids = @(Get-WtfRdpSession | Where-Object { $_.WinStation -match 'rdp-tcp#' } | ForEach-Object { $_.Id }) } catch {}
+    }
+    $sids = @(@($tableSids) + @($logSids) | Sort-Object -Unique)
+    $sibCount = Get-WtfRdpSiblingCount -SessionIds $tableSids -LogSessionIds $logSids
 
-    $v = Get-WtfRdpArbitrationVerdict -StuckArbitrations $stuck.Count -SiblingCount $sids.Count -ProbeRefused $ProbeRefused
+    $v = Get-WtfRdpArbitrationVerdict -StuckArbitrations $stuck.Count -SiblingCount $sibCount -ProbeRefused $ProbeRefused
     [pscustomobject]@{
         Blocked           = $v.Blocked
         Confidence        = $v.Confidence
         StuckArbitrations = $stuck.Count
         SiblingSessionIds = ($sids -join ',')
-        SiblingCount      = $sids.Count
+        SiblingCount      = $sibCount
         ProbeRefused      = $ProbeRefused
         Evidence          = if ($stuck) { "stuck arbitration (Id=41 no Id=42) @ " + (($stuck | ForEach-Object { $_.TimeCreated }) -join '; ') } else { "no stuck arbitration" }
         Source            = if ($EvtxPath) { "evtx:$EvtxPath" } else { "live:$LogName" }
@@ -282,4 +322,4 @@ function Invoke-WtfRdpRescue {
     }
 }
 
-Export-ModuleMember -Function Get-WtfRdpSession, Get-WtfRdpWedgeEventSid, Lock-WtfRdpSession, Get-WtfRdpVerifyVerdict, Invoke-WtfRdpRescue, Get-WtfRdpArbitrationVerdict, Get-WtfRdpArbitrationBlock
+Export-ModuleMember -Function Get-WtfRdpSession, Get-WtfRdpWedgeEventSid, Lock-WtfRdpSession, Get-WtfRdpVerifyVerdict, Invoke-WtfRdpRescue, Get-WtfRdpSiblingCount, Get-WtfRdpArbitrationVerdict, Get-WtfRdpArbitrationBlock, Get-WtfRdpBlockScreenVerdict

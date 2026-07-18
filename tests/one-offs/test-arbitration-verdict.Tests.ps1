@@ -54,3 +54,24 @@ Describe 'Get-WtfRdpArbitrationVerdict (arbitration-block detector)' {
         $v.Blocked | Should Be $true
     }
 }
+
+Describe 'Get-WtfRdpSiblingCount (l#13 -- log-text undercount fix)' {
+    # Ground truth from the live 2026-07-12 21:28 storm: the session table piled up rdp-tcp#
+    # sessions 11/12/13 alongside the target (3), but the LSM arbitration messages named only
+    # "Session 3". The old detector counted siblings from log text -> 1 -> Blocked=False (WRONG).
+    It 'THE BUG: log text alone sees only the named session -> undercounts to 1' {
+        Get-WtfRdpSiblingCount -LogSessionIds @(3) | Should Be 1
+    }
+    It 'THE FIX: the live session table catches the 11/12/13 pileup the log missed -> 4' {
+        Get-WtfRdpSiblingCount -SessionIds @(3,11,12,13) -LogSessionIds @(3) | Should Be 4
+    }
+    It 'union is de-duplicated (a session named in both log and table counts once)' {
+        Get-WtfRdpSiblingCount -SessionIds @(3,11) -LogSessionIds @(3,11,12) | Should Be 3
+    }
+    It 'table-only (no log references) still counts' {
+        Get-WtfRdpSiblingCount -SessionIds @(3,11,12,13) | Should Be 4
+    }
+    It 'nothing -> 0' {
+        Get-WtfRdpSiblingCount | Should Be 0
+    }
+}

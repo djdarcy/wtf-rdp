@@ -1,7 +1,7 @@
 {
     "name": "test",
-    "version": "0.1.0",
-    "description": "Reproduce the LSM arbitration block on a throwaway session to check vulnerability + validate the fix (DANGEROUS).",
+    "version": "0.4.0",
+    "description": "Reproduce, detect, and visually verify the LSM console-session arbitration block (client/server/verify; confirmed recipe + pixel block-screen check; create-vs-detect precheck; opt-in destructive -SignOut; DANGEROUS).",
     "category": "sessfix",
     "runtime": {
         "type": "shell",
